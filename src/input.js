@@ -127,6 +127,10 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
   let activePointer = null;
   let fireTimer = null;
   const FIRE_INTERVAL_MS = 220;
+  // Distinguish a static tap (rotate) from a drag (commit) on touch.
+  // 5px in client space — small enough to ignore finger jitter, large enough
+  // to feel intentional.
+  const TAP_SLOP_PX = 5;
 
   function startContinuousFire() {
     if (fireTimer) return;
@@ -170,6 +174,19 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
     const { ix, iy } = mapper.clientToInternal(e.clientX, e.clientY);
     state.aimX = ix;
     state.aimY = iy;
+
+    // Track max drag distance from press start so pointerup can decide
+    // tap-to-rotate vs drag-to-commit.
+    if (
+      activePointer &&
+      activePointer.id === e.pointerId &&
+      activePointer.kind === "place"
+    ) {
+      const dx = e.clientX - activePointer.startX;
+      const dy = e.clientY - activePointer.startY;
+      const d = Math.hypot(dx, dy);
+      if (d > activePointer.moved) activePointer.moved = d;
+    }
 
     if (state.gameOver || state.bannerActive) return;
 
@@ -218,8 +235,16 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
       setHoverFromClient(e.clientX, e.clientY, touchAdjustmentsFor(e));
 
       if (isTouch) {
-        // Touch: just show preview; commit on release.
-        activePointer = { id: e.pointerId, kind: "place", erase: isErase };
+        // Touch: just show preview; on release, a static tap rotates and a
+        // drag commits placement.
+        activePointer = {
+          id: e.pointerId,
+          kind: "place",
+          erase: isErase,
+          startX: e.clientX,
+          startY: e.clientY,
+          moved: 0,
+        };
         return;
       }
 
@@ -242,7 +267,12 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
     }
 
     if (ap.kind === "place") {
-      // Place at the *release* tile, allowing drag-to-position.
+      // Static tap (no real drag) → rotate without placing.
+      // Drag (≥ TAP_SLOP_PX moved) → place at the release tile.
+      if ((ap.moved || 0) < TAP_SLOP_PX) {
+        rotate();
+        return;
+      }
       setHoverFromClient(e.clientX, e.clientY, touchAdjustmentsFor(e));
       const isErase = ap.erase || (ui?.isEraseMode === true);
       commitPlacement(isErase);
