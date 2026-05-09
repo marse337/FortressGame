@@ -78,6 +78,55 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
     }
   }
 
+  // --- Hold-to-place / hold-to-fire state ---------------------------------
+  // Touch flow:
+  //   - BUILD/TURRET: pointerdown shows preview only; pointerup commits place/erase.
+  //     A second finger anywhere on the canvas while the first is held = rotate.
+  //   - COMBAT: pointerdown fires once, then continues at FIRE_INTERVAL_MS until release.
+  // Mouse flow keeps the original click-to-place behavior, but also supports
+  // hold-to-fire in COMBAT (consistent feel across input types).
+  let activePointer = null;
+  let fireTimer = null;
+  const FIRE_INTERVAL_MS = 220;
+
+  function startContinuousFire() {
+    if (fireTimer) return;
+    fireTimer = setInterval(() => {
+      if (state.gameOver || state.bannerActive || state.phase !== "COMBAT") {
+        stopContinuousFire();
+        return;
+      }
+      combat.fireTurretsAt(state.aimX, state.aimY);
+    }, FIRE_INTERVAL_MS);
+  }
+
+  function stopContinuousFire() {
+    if (fireTimer) {
+      clearInterval(fireTimer);
+      fireTimer = null;
+    }
+  }
+
+  function commitPlacement(isErase) {
+    if (state.gameOver || state.bannerActive) return;
+
+    if (state.phase === "BUILD") {
+      if (isErase) build.eraseAtHover();
+      else build.placeAtHover();
+      return;
+    }
+
+    if (state.phase === "TURRET") {
+      if (isErase) turret.eraseAtAnchor();
+      else turret.placeAtHover();
+
+      if (shouldEndTurretPhaseEarly()) {
+        state.timerRunning = false;
+        flow.beginCombatPhase();
+      }
+    }
+  }
+
   view.addEventListener("pointermove", (e) => {
     const { ix, iy } = mapper.clientToInternal(e.clientX, e.clientY);
     state.aimX = ix;
@@ -93,42 +142,79 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
   view.addEventListener("contextmenu", (e) => e.preventDefault());
 
   view.addEventListener("pointerdown", (e) => {
-    // Touch devices don't get pointermove before pointerdown, so make sure
-    // the aim/hover reflects the actual tap location.
+    // Second finger during a placement hold → rotate (no need to release).
+    if (
+      activePointer &&
+      activePointer.id !== e.pointerId &&
+      activePointer.kind === "place"
+    ) {
+      e.preventDefault();
+      rotate();
+      return;
+    }
+
+    // Aim/hover should reflect the actual tap location even on touch
+    // (touch devices don't get a pointermove before pointerdown).
     const { ix, iy } = mapper.clientToInternal(e.clientX, e.clientY);
     state.aimX = ix;
     state.aimY = iy;
 
-    if (state.gameOver) return;
-    if (state.bannerActive) return;
+    if (state.gameOver || state.bannerActive) return;
 
-    if (state.phase === "COMBAT" && (e.button === 0 || e.pointerType !== "mouse")) {
-      combat.fireTurretsAt(state.aimX, state.aimY);
-      return;
-    }
-
+    const isTouch = e.pointerType !== "mouse";
     const isErase = e.button === 2 || (ui?.isEraseMode === true);
 
-    if (state.phase === "BUILD") {
+    if (state.phase === "COMBAT") {
+      // Mouse: only respond to left button. Touch/pen: any.
+      if (!isTouch && e.button !== 0) return;
       view.setPointerCapture?.(e.pointerId);
-      setHoverFromClient(e.clientX, e.clientY);
-      if (isErase) build.eraseAtHover();
-      else build.placeAtHover();
+      activePointer = { id: e.pointerId, kind: "fire" };
+      combat.fireTurretsAt(state.aimX, state.aimY);
+      startContinuousFire();
       return;
     }
 
-    if (state.phase === "TURRET") {
+    if (state.phase === "BUILD" || state.phase === "TURRET") {
       view.setPointerCapture?.(e.pointerId);
       setHoverFromClient(e.clientX, e.clientY);
 
-      if (isErase) turret.eraseAtAnchor();
-      else turret.placeAtHover();
-
-      if (shouldEndTurretPhaseEarly()) {
-        state.timerRunning = false;
-        flow.beginCombatPhase();
+      if (isTouch) {
+        // Touch: just show preview; commit on release.
+        activePointer = { id: e.pointerId, kind: "place", erase: isErase };
+        return;
       }
+
+      // Mouse: place immediately (original click-to-place feel).
+      activePointer = { id: e.pointerId, kind: "press" };
+      commitPlacement(isErase);
     }
+  });
+
+  view.addEventListener("pointerup", (e) => {
+    if (!activePointer || activePointer.id !== e.pointerId) return;
+
+    const ap = activePointer;
+    activePointer = null;
+    view.releasePointerCapture?.(e.pointerId);
+
+    if (ap.kind === "fire") {
+      stopContinuousFire();
+      return;
+    }
+
+    if (ap.kind === "place") {
+      // Place at the *release* tile, allowing drag-to-position.
+      setHoverFromClient(e.clientX, e.clientY);
+      const isErase = ap.erase || (ui?.isEraseMode === true);
+      commitPlacement(isErase);
+    }
+    // "press" (mouse): already placed on pointerdown.
+  });
+
+  view.addEventListener("pointercancel", (e) => {
+    if (!activePointer || activePointer.id !== e.pointerId) return;
+    activePointer = null;
+    stopContinuousFire();
   });
 
   window.addEventListener("keydown", (e) => {
