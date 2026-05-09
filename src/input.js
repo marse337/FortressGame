@@ -2,7 +2,7 @@
 import { CONFIG } from "./config.js";
 import { rotatePiece } from "./pieces.js";
 
-export function initInput({ view, state, mapper, build, turret, combat, flow }) {
+export function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
   function internalToTile(ix, iy) {
     return { tx: Math.floor(ix / CONFIG.TILE), ty: Math.floor(iy / CONFIG.TILE) };
   }
@@ -43,6 +43,41 @@ export function initInput({ view, state, mapper, build, turret, combat, flow }) 
     return false;
   };
 
+  // Reusable handlers (also called from on-screen buttons via main.js)
+  function rotate() {
+    if (state.gameOver || state.bannerActive) return;
+
+    if (state.phase === "BUILD") {
+      state.piece = rotatePiece(state.piece);
+      const h = state.hover;
+      if (h?.x >= 0 && h?.y >= 0) build.setHover(h.x, h.y);
+      return;
+    }
+
+    if (state.phase === "TURRET") {
+      state.turretDir = (state.turretDir || 0) ^ 1;
+      const h = state.hover;
+      if (h?.x >= 0 && h?.y >= 0) turret.setHover(h.x, h.y);
+    }
+  }
+
+  function skip() {
+    if (state.gameOver || state.bannerActive) return;
+
+    if (state.phase === "BUILD") {
+      // Don't allow skip without a courtyard - would cause game over
+      if (!state.courtyardRegions || state.courtyardRegions.length === 0) return;
+      state.timerRunning = false;
+      flow.beginTurretPhase();
+      return;
+    }
+
+    if (state.phase === "TURRET") {
+      state.timerRunning = false;
+      flow.beginCombatPhase();
+    }
+  }
+
   view.addEventListener("pointermove", (e) => {
     const { ix, iy } = mapper.clientToInternal(e.clientX, e.clientY);
     state.aimX = ix;
@@ -58,18 +93,26 @@ export function initInput({ view, state, mapper, build, turret, combat, flow }) 
   view.addEventListener("contextmenu", (e) => e.preventDefault());
 
   view.addEventListener("pointerdown", (e) => {
+    // Touch devices don't get pointermove before pointerdown, so make sure
+    // the aim/hover reflects the actual tap location.
+    const { ix, iy } = mapper.clientToInternal(e.clientX, e.clientY);
+    state.aimX = ix;
+    state.aimY = iy;
+
     if (state.gameOver) return;
     if (state.bannerActive) return;
 
-    if (state.phase === "COMBAT" && e.button === 0) {
+    if (state.phase === "COMBAT" && (e.button === 0 || e.pointerType !== "mouse")) {
       combat.fireTurretsAt(state.aimX, state.aimY);
       return;
     }
 
+    const isErase = e.button === 2 || (ui?.isEraseMode === true);
+
     if (state.phase === "BUILD") {
       view.setPointerCapture?.(e.pointerId);
       setHoverFromClient(e.clientX, e.clientY);
-      if (e.button === 2) build.eraseAtHover();
+      if (isErase) build.eraseAtHover();
       else build.placeAtHover();
       return;
     }
@@ -78,7 +121,7 @@ export function initInput({ view, state, mapper, build, turret, combat, flow }) 
       view.setPointerCapture?.(e.pointerId);
       setHoverFromClient(e.clientX, e.clientY);
 
-      if (e.button === 2) turret.eraseAtAnchor();
+      if (isErase) turret.eraseAtAnchor();
       else turret.placeAtHover();
 
       if (shouldEndTurretPhaseEarly()) {
@@ -97,39 +140,15 @@ export function initInput({ view, state, mapper, build, turret, combat, flow }) 
     // Space or Enter to skip current phase
     if (key === " " || key === "enter") {
       e.preventDefault();
-
-      if (state.phase === "BUILD") {
-        // Check if player has a courtyard before allowing skip
-        if (!state.courtyardRegions || state.courtyardRegions.length === 0) {
-          // No courtyard - don't allow skip (would cause game over)
-          return;
-        }
-        state.timerRunning = false;
-        flow.beginTurretPhase();
-        return;
-      }
-
-      if (state.phase === "TURRET") {
-        state.timerRunning = false;
-        flow.beginCombatPhase();
-        return;
-      }
+      skip();
+      return;
     }
 
     // R to rotate
     if (key === "r") {
-      if (state.phase === "BUILD") {
-        state.piece = rotatePiece(state.piece);
-        const h = state.hover;
-        if (h?.x >= 0 && h?.y >= 0) build.setHover(h.x, h.y);
-        return;
-      }
-
-      if (state.phase === "TURRET") {
-        state.turretDir = (state.turretDir || 0) ^ 1;
-        const h = state.hover;
-        if (h?.x >= 0 && h?.y >= 0) turret.setHover(h.x, h.y);
-      }
+      rotate();
     }
   });
+
+  return { rotate, skip };
 }

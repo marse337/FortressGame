@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Island Fortress - Rampart Clone</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -75,15 +78,28 @@
       ></canvas>
     </div>
 
-    <!-- Controls hint -->
-    <div class="controls-hint">
-      <span class="key">LMB</span> Place
-      <span class="key">RMB</span> Erase
-      <span class="key">R</span> Rotate
-      <span class="key">Space</span> Skip Phase
+    <!-- Action buttons (touch + desktop) -->
+    <div class="action-bar">
+      <button id="btnRotate" type="button" class="btn-action" disabled>
+        <span class="btn-icon" aria-hidden="true">&#x21BB;</span>
+        <span class="btn-label">Rotate</span>
+        <span class="btn-key">R</span>
+      </button>
+      <button id="btnErase" type="button" class="btn-action" aria-pressed="false" disabled>
+        <span class="btn-icon" aria-hidden="true">&#x2715;</span>
+        <span class="btn-label">Erase</span>
+        <span class="btn-key">RMB</span>
+      </button>
+      <button id="btnSkip" type="button" class="btn-action" disabled>
+        <span class="btn-icon" aria-hidden="true">&#x00BB;</span>
+        <span class="btn-label">Skip</span>
+        <span class="btn-key">Space</span>
+      </button>
     </div>
   </div>
 
-  <script type="module" src="./src/main.js"></script>
+  <!-- Single bundled script (works on file:// and on a server). -->
+  <!-- Source lives in src/*.js - run `node build.mjs` after editing to regenerate. -->
+  <script src="./game.js"></script>
 </body>
 </html>
