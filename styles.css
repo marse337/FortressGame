@@ -21,6 +21,8 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
 }
 
 .wrap {
@@ -176,6 +178,10 @@ button {
   transition: all 0.2s ease;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .btn-primary {
@@ -316,43 +322,108 @@ canvas {
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.5),
     0 0 60px rgba(59, 130, 246, 0.1);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
-/* Controls Hint */
-.controls-hint {
+/* Action Bar (Rotate / Erase / Skip) - works for mouse and touch */
+.action-bar {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 10px;
   margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 10px;
+  min-height: 48px;
+  min-width: 88px;
+  justify-content: center;
   font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-action:active {
+  transform: translateY(1px);
+}
+
+.btn-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-action[aria-pressed="true"] {
+  background: linear-gradient(135deg, var(--danger) 0%, #b91c1c 100%);
+  border-color: var(--danger);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.45);
+}
+
+.btn-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.btn-label {
+  font-size: 13px;
+}
+
+.btn-key {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--muted);
 }
 
-.key {
-  display: inline-block;
-  padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  margin-right: 4px;
+/* Hide keyboard hints on devices without a hover-capable pointer (touch) */
+@media (hover: none) {
+  .btn-key { display: none; }
 }
 
 /* Responsive */
 @media (max-width: 700px) {
+  .wrap {
+    padding: 8px;
+  }
+
+  .panel {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
   .hud-top {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
 
   .timer-container,
   .wave-container {
     flex-direction: row;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 10px 14px;
   }
 
   .timer-display {
@@ -368,8 +439,23 @@ canvas {
     justify-content: center;
   }
 
-  .controls-hint {
+  .action-bar {
+    gap: 6px;
+  }
+
+  .btn-action {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 12px 8px;
+    font-size: 12px;
+  }
+
+  .options-row {
     flex-wrap: wrap;
     gap: 12px;
+  }
+
+  .status {
+    font-size: 14px;
   }
 }

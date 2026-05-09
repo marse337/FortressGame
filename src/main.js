@@ -50,12 +50,15 @@ function buildFreshLayout() {
 
 const mapper = createMapper(view);
 
-// flow is referenced by UI callbacks, so define it before initUI
+// flow and input are referenced by UI callbacks, so define them before initUI
 let flow = null;
+let input = null;
 
 const ui = initUI({
   onRestart: () => flow?.resetToLobby(),
   onStart: () => flow?.startGame(),
+  onRotate: () => input?.rotate(),
+  onSkip: () => input?.skip(),
 });
 
 const build = initBuildPhase({
@@ -101,9 +104,9 @@ flow = initFlow({
 });
 
 // Input routes pointer/keyboard to the correct phase handlers
-initInput({ view, state, mapper, build, turret, combat, flow });
+input = initInput({ view, state, mapper, build, turret, combat, flow, ui });
 
-// Resize view
+// Resize view (CSS handles visual scaling via `width: min(940px, 100%)`)
 function resizeView() {
   const maxW = Math.min(CONFIG.VIEW_MAX_W, document.documentElement.clientWidth - CONFIG.VIEW_PADDING);
   const w = Math.max(CONFIG.VIEW_MIN_W, maxW | 0);

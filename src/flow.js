@@ -20,6 +20,7 @@ export function initFlow({
     state.phase = "LOBBY";
     state.wave = 1;
     ui.setRound(state.wave);
+    ui.setActionsForPhase?.(state.phase);
     state.gameOver = false;
 
     state.timerRunning = false;
@@ -40,15 +41,17 @@ export function initFlow({
 
   function beginBuildPhase() {
     state.phase = "BUILD";
+    ui.setActionsForPhase?.(state.phase);
     ui.setRound(state.wave);
     state.timeLeft = ROUND_SECONDS;
     ui.setTime(state.timeLeft);
-    ui.setStatus(`Wave ${state.wave}: Build walls (R rotate, Space skip)`);
+    ui.setStatus(`Wave ${state.wave}: Build walls. Use Rotate / Skip below.`);
     startPhaseBanner("Create your fortress");
   }
 
   function beginTurretPhase() {
     state.phase = "TURRET";
+    ui.setActionsForPhase?.(state.phase);
     state.turretsPlacedThisWave = 0;
 
     state.timeLeft = ROUND_SECONDS;
@@ -59,7 +62,7 @@ export function initFlow({
     const maxTotal = turret?.maxTotalTurretsForCourtyard?.() ?? 1;
 
     ui.setStatus(
-      `Place up to ${maxThisWave} turrets (R rotate, Space skip). Total cap: ${maxTotal}`
+      `Place up to ${maxThisWave} turrets. Total cap: ${maxTotal}`
     );
 
     startPhaseBanner("Place your turrets");
@@ -67,9 +70,10 @@ export function initFlow({
 
   function beginCombatPhase() {
     state.phase = "COMBAT";
+    ui.setActionsForPhase?.(state.phase);
     state.timeLeft = ROUND_SECONDS;
     ui.setTime(state.timeLeft);
-    ui.setStatus("Defend your walls (aim cursor, click to fire)");
+    ui.setStatus("Defend your walls — tap/click to fire.");
 
     spawnEnemiesForWave(state.wave);
     startPhaseBanner("Combat!");
@@ -100,6 +104,7 @@ export function initFlow({
 
   function gameOver(msg) {
     state.phase = "GAMEOVER";
+    ui.setActionsForPhase?.(state.phase);
     state.gameOver = true;
     state.timerRunning = false;
     state.bannerActive = false;

@@ -1,8 +1,11 @@
 import { ROUND_SECONDS } from "./gameConstants.js";
 
-export function initUI({ onRestart, onStart }) {
+export function initUI({ onRestart, onStart, onRotate, onSkip }) {
     const btnRestart = document.getElementById("btnRestart");
     const btnStart = document.getElementById("btnStart");
+    const btnRotate = document.getElementById("btnRotate");
+    const btnErase = document.getElementById("btnErase");
+    const btnSkip = document.getElementById("btnSkip");
 
     const chkGrid = document.getElementById("chkGrid");
     const chkScanlines = document.getElementById("chkScanlines");
@@ -14,10 +17,29 @@ export function initUI({ onRestart, onStart }) {
     const timerBar = document.getElementById("timerBar");
     const timerDisplay = txtTime?.parentElement;
 
+    let eraseMode = false;
+
+    function setEraseMode(on) {
+        eraseMode = !!on;
+        if (btnErase) btnErase.setAttribute("aria-pressed", eraseMode ? "true" : "false");
+    }
+
+    function setActionsForPhase(phase) {
+        const placing = phase === "BUILD" || phase === "TURRET";
+        if (btnRotate) btnRotate.disabled = !placing;
+        if (btnErase) btnErase.disabled = !placing;
+        if (btnSkip) btnSkip.disabled = !placing;
+        if (!placing) setEraseMode(false);
+    }
+
     const ui = {
         get grid() { return chkGrid?.checked ?? false; },
         get scanlines() { return chkScanlines?.checked ?? false; },
         get waves() { return chkWaves?.checked ?? true; },
+
+        get isEraseMode() { return eraseMode; },
+        setEraseMode,
+        setActionsForPhase,
 
         setTime(seconds) {
             if (txtTime) txtTime.textContent = seconds.toFixed(1);
@@ -57,6 +79,9 @@ export function initUI({ onRestart, onStart }) {
 
     btnRestart?.addEventListener("click", () => onRestart?.());
     btnStart?.addEventListener("click", () => onStart?.());
+    btnRotate?.addEventListener("click", () => onRotate?.());
+    btnSkip?.addEventListener("click", () => onSkip?.());
+    btnErase?.addEventListener("click", () => setEraseMode(!eraseMode));
 
     return ui;
 }
