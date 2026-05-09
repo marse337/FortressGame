@@ -1566,12 +1566,51 @@ function initUI({ onRestart, onStart, onRotate, onSkip }) {
 // src/input.js
 
 function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
+  // Mobile placement aids (BUILD/TURRET only):
+  //   - lift the anchor TOUCH_LIFT_TILES tiles above the finger so the preview isn't covered
+  //   - clamp anchor onto the island ellipse so dragging into water "skates" along the coast
+  const TOUCH_LIFT_TILES = 5;
+  const ISLAND_PROJECT_FACTOR = 0.96; // just inside the 0.98 placement boundary
+
   function internalToTile(ix, iy) {
     return { tx: Math.floor(ix / CONFIG.TILE), ty: Math.floor(iy / CONFIG.TILE) };
   }
 
-  function setHoverFromClient(clientX, clientY) {
-    const { ix, iy } = mapper.clientToInternal(clientX, clientY);
+  function projectOntoIsland(ix, iy) {
+    const cx = state.cx, cy = state.cy;
+    const rx = (state.rx || 0) * ISLAND_PROJECT_FACTOR;
+    const ry = (state.ry || 0) * ISLAND_PROJECT_FACTOR;
+    if (rx <= 0 || ry <= 0) return { ix, iy };
+
+    const dx = ix - cx;
+    const dy = iy - cy;
+    const norm = Math.sqrt((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry));
+    if (norm <= 1) return { ix, iy };
+
+    return { ix: cx + dx / norm, iy: cy + dy / norm };
+  }
+
+  function isPlacementPhase() {
+    return state.phase === "BUILD" || state.phase === "TURRET";
+  }
+
+  function touchAdjustmentsFor(e) {
+    if (!e || e.pointerType === "mouse" || !isPlacementPhase()) return null;
+    return { yOffsetPixels: -TOUCH_LIFT_TILES * CONFIG.TILE, clamp: true };
+  }
+
+  function setHoverFromClient(clientX, clientY, adj = null) {
+    let { ix, iy } = mapper.clientToInternal(clientX, clientY);
+
+    if (adj) {
+      iy += adj.yOffsetPixels || 0;
+      if (adj.clamp) {
+        const p = projectOntoIsland(ix, iy);
+        ix = p.ix;
+        iy = p.iy;
+      }
+    }
+
     const { tx, ty } = internalToTile(ix, iy);
 
     const maxTx = Math.floor(CONFIG.INTERNAL_W / CONFIG.TILE) - 1;
@@ -1697,8 +1736,8 @@ function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
 
     if (state.gameOver || state.bannerActive) return;
 
-    if (state.phase === "BUILD" || state.phase === "TURRET") {
-      setHoverFromClient(e.clientX, e.clientY);
+    if (isPlacementPhase()) {
+      setHoverFromClient(e.clientX, e.clientY, touchAdjustmentsFor(e));
     }
   });
 
@@ -1737,9 +1776,9 @@ function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
       return;
     }
 
-    if (state.phase === "BUILD" || state.phase === "TURRET") {
+    if (isPlacementPhase()) {
       view.setPointerCapture?.(e.pointerId);
-      setHoverFromClient(e.clientX, e.clientY);
+      setHoverFromClient(e.clientX, e.clientY, touchAdjustmentsFor(e));
 
       if (isTouch) {
         // Touch: just show preview; commit on release.
@@ -1767,7 +1806,7 @@ function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
 
     if (ap.kind === "place") {
       // Place at the *release* tile, allowing drag-to-position.
-      setHoverFromClient(e.clientX, e.clientY);
+      setHoverFromClient(e.clientX, e.clientY, touchAdjustmentsFor(e));
       const isErase = ap.erase || (ui?.isEraseMode === true);
       commitPlacement(isErase);
     }
