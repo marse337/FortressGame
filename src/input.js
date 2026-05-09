@@ -245,6 +245,7 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
           startY: e.clientY,
           moved: 0,
         };
+        state.touchPlacing = true; // tells renderer to draw the leash
         return;
       }
 
@@ -259,6 +260,7 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
 
     const ap = activePointer;
     activePointer = null;
+    state.touchPlacing = false;
     view.releasePointerCapture?.(e.pointerId);
 
     if (ap.kind === "fire") {
@@ -283,6 +285,7 @@ export function initInput({ view, state, mapper, build, turret, combat, flow, ui
   view.addEventListener("pointercancel", (e) => {
     if (!activePointer || activePointer.id !== e.pointerId) return;
     activePointer = null;
+    state.touchPlacing = false;
     stopContinuousFire();
   });
 

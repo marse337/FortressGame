@@ -1356,6 +1356,51 @@ function renderHover(ctx, state) {
 }
 
 
+// Leash from finger to the lifted anchor, only while a touch placement
+// is in progress. Helps the user's eye connect their finger to the offset
+// preview piece.
+function renderTouchLeash(ctx, state) {
+  if (!state.touchPlacing) return;
+  if (state.phase !== "BUILD" && state.phase !== "TURRET") return;
+
+  const cells = state.hover?.cells;
+  if (!cells || !cells.length) return;
+
+  let sx = 0, sy = 0;
+  for (const c of cells) {
+    sx += c.x * CONFIG.TILE + CONFIG.TILE / 2;
+    sy += c.y * CONFIG.TILE + CONFIG.TILE / 2;
+  }
+  sx = (sx / cells.length) | 0;
+  sy = (sy / cells.length) | 0;
+
+  const fx = state.aimX | 0;
+  const fy = state.aimY | 0;
+
+  // Don't draw a degenerate near-zero-length line
+  if (Math.hypot(fx - sx, fy - sy) < 6) return;
+
+  const ok = !!state.hover.valid;
+  const color = ok ? "#e5e7eb" : "#ff4d4d";
+
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(sx + 0.5, sy + 0.5);
+  ctx.lineTo(fx + 0.5, fy + 0.5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Small dot at finger position
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = color;
+  ctx.fillRect(fx - 1, fy - 1, 3, 3);
+  ctx.restore();
+}
+
 function renderGridOverlay(ctx) {
   ctx.globalAlpha = 0.25;
   ctx.strokeStyle = PAL.grid;
@@ -1449,6 +1494,7 @@ function renderFrame({ ctx, buf, vctx, view, state, ui }, t) {
 
   renderBorder(ctx);
   renderHover(ctx, state);
+  renderTouchLeash(ctx, state);
 
   // Banner on top of everything
   renderBanner(ctx, state);
@@ -1808,6 +1854,7 @@ function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
           startY: e.clientY,
           moved: 0,
         };
+        state.touchPlacing = true; // tells renderer to draw the leash
         return;
       }
 
@@ -1822,6 +1869,7 @@ function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
 
     const ap = activePointer;
     activePointer = null;
+    state.touchPlacing = false;
     view.releasePointerCapture?.(e.pointerId);
 
     if (ap.kind === "fire") {
@@ -1846,6 +1894,7 @@ function initInput({ view, state, mapper, build, turret, combat, flow, ui }) {
   view.addEventListener("pointercancel", (e) => {
     if (!activePointer || activePointer.id !== e.pointerId) return;
     activePointer = null;
+    state.touchPlacing = false;
     stopContinuousFire();
   });
 
